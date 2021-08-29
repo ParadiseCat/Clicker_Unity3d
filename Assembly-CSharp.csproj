@@ -8,7 +8,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProductVersion>10.0.20506</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
-    <RootNamespace></RootNamespace>
+    <RootNamespace>
+    </RootNamespace>
     <ProjectGuid>{A9BBE845-A60A-54B8-0492-D368BDF7E73A}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
@@ -66,7 +67,7 @@
     <Compile Include="Assets\Patterns\Singleton\Controller.cs" />
     <Compile Include="Assets\Controller\SceneControllers\OverController.cs" />
     <Compile Include="Assets\Patterns\AnimatedModel\IAnimatedModel.cs" />
-    <Compile Include="Assets\Controller\SceneControllers\PlayGUI.cs" />
+    <Compile Include="Assets\Controller\Managers\GameState.cs" />
     <Compile Include="Assets\Patterns\RandomMove\IRandomMoveble.cs" />
     <Compile Include="Assets\Patterns\Clickable\IClickable.cs" />
     <Compile Include="Assets\Patterns\RandomMove\IRandomMove.cs" />

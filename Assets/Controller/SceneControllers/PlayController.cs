@@ -14,10 +14,14 @@ namespace Clicker
     internal class PlayController : Controller<PlayController>, IUpdate, IRandomMoveble, IClickable
     {
         private const int MAX_SIZE = 10;
+        private const float SPEED_MOVE = 0.03f;
+        private const float BASE_HP = 3f;
+        private const float GROW_HP = 0.05f;
+        private const float MAX_DAMAGE = 3f;
+        private const float DAMAGE_RADIUS = 80f;
 
         private int fullTimeSpawn = 200;
         private int timeSpawn;
-        private int hpMonster = 3;
 
         private int spawnMonster = 0;
 
@@ -33,9 +37,9 @@ namespace Clicker
         int skinCount;
         string animRes;
 
-        /// <summary>
-        /// инициализация обновляемого объекта
-        /// </summary>
+
+        // 1. MONOBEHAVIOUR
+
         private void Start()
         {
             GameManager.Instance.SetUpdateBehaviour(this);
@@ -61,9 +65,6 @@ namespace Clicker
             AddMonster();
         }
 
-        /// <summary>
-        /// удаление обновляемого объекта
-        /// </summary>
         private void OnDestroy()
         {
             GameManager.Instance.ResetUpdateBehaviour(this);
@@ -74,9 +75,6 @@ namespace Clicker
             }
         }
 
-        /// <summary>
-        /// определение функционала при обновлении наследника
-        /// </summary>
         public virtual void OnUpdate(float deltaTime)
         {
             // выход ли?
@@ -92,130 +90,44 @@ namespace Clicker
             UpdateSpawn();
         }
 
+
+        // 2. MONSTER
+
         private void AddMonster()
         {
-            GameObject obj = new GameObject("Monster");
+            spawnMonster++;
+
+            GameObject obj = Instantiate(Resources.Load(anim.Res_Path + anim.Name)) as GameObject;
+            obj.name = "Monster_" + spawnMonster.ToString();
+            obj.transform.position = GetStartPosition();
+
             Monster monster = obj.AddComponent<Monster>();
-            monster.AddModel(anim.Name, anim.Res_Path, GetStartPosition(), hpMonster);
+            monster.InitHealth(BASE_HP + GROW_HP * (spawnMonster - 1));
+
             monster.ScaleModel(new Vector3(0.25f, 0.25f, 0.25f));
+            monster.SetRotation(new Quaternion(0f, 180f, 0f, 0f));
+            monster.SetBounds(minBound, maxBound);
+            monster.SetDirection(GetDirectionVector(SPEED_MOVE), random.Next(400, 800));
+
             monster.AddSkin(skins[random.Next(0, skinCount)], animRes);
             monster.AddAnimation(anim.Animation(Mushroom.Animations.Idle), animRes);
             monster.AddAnimation(anim.Animation(Mushroom.Animations.Run), animRes);
             monster.AddAnimation(anim.Animation(Mushroom.Animations.Death), animRes);
             monster.PlayAnimation(anim.Animation(Mushroom.Animations.Run));
-            monster.SetRotation(new Quaternion(0f, 180f, 0f, 0f));
-            monster.SetBounds(minBound, maxBound);
+        }
 
-            monster.SetDirection(GetDirectionVector(0.03f), random.Next(400, 800));
-
-            spawnMonster++;
-
-            if (spawnMonster >= 25)
+        public void ChangeAnimation(Monster obj, float remainsHpPart)
+        {
+            if (remainsHpPart < 0.66f)
             {
-                spawnMonster = 0;
-                hpMonster++;
-            }
-        }
-
-        /// <summary>
-        /// Добавление в список IRandomMove
-        /// </summary>
-        public void AddRandomMove(IRandomMove obj)
-        {
-            monsterList.Add(obj);
-
-            if (monsterList.Count >= MAX_SIZE)
-            {
-                GameManager.GoToScene(GameData.Scene.MenuScene);
-            }
-        }
-
-        /// <summary>
-        /// Удаление из списка IRandomMove при удалении этого объекта
-        /// </summary>
-        public void RemoveRandomMove(IRandomMove obj)
-        {
-            if (monsterList.Contains(obj))
-            {
-                monsterList.Remove(obj);
-            }
-        }
-
-        public void AddClicker(IClick obj)
-        {
-            clickerList.Add(obj);
-        }
-
-        public void RemoveClicker(IClick obj)
-        {
-            clickerList.Remove(obj);
-        }
-
-        /// <summary>
-        /// Проверка статуса движения IRandomMove
-        /// </summary>
-        public void UpdateRandomMove()
-        {
-            foreach(IRandomMove obj in monsterList)
-            {
-                if (obj.MoveTo())
+                if (remainsHpPart < 0.33f)
                 {
-                    obj.SetDirection(GetDirectionVector(0.03f), random.Next(400, 800));
+                    obj.PlayAnimation(anim.Animation(Mushroom.Animations.Death));
                 }
-            }
-        }
-
-        public void ChangeAnimation(Monster obj, int state)
-        {
-            if (state == 2)
-            {
-                obj.PlayAnimation(anim.Animation(Mushroom.Animations.Idle));
-            }
-            else if (state == 1)
-            {
-                obj.PlayAnimation(anim.Animation(Mushroom.Animations.Death));
-            }
-        }
-
-        private void UpdateSpawn()
-        {
-            if (timeSpawn-- <= 0)
-            {
-                fullTimeSpawn = Mathf.RoundToInt(fullTimeSpawn * 0.99f);
-                timeSpawn = fullTimeSpawn;
-
-                AddMonster();
-            }
-        }
-
-        public void UpdateClicker()
-        {
-            if (Input.touchCount > 0)
-            {
-                Touch touch = Input.GetTouch(0);
-                
-                if (touch.phase == TouchPhase.Stationary)
+                else
                 {
-                    foreach (IClick obj in clickerList)
-                    {
-                        obj.Click(touch.position);
-                    }
+                    obj.PlayAnimation(anim.Animation(Mushroom.Animations.Idle));
                 }
-            }
-            else if (Input.GetMouseButtonDown(0))
-            {
-                foreach (IClick obj in clickerList)
-                {
-                    obj.Click(Input.mousePosition);
-                }
-            }
-        }
-
-        private void UpdateCheckQuit()
-        {
-            if (Input.GetKey(KeyCode.Home) || Input.GetKey(KeyCode.Escape) || Input.GetKey(KeyCode.Menu))
-            {
-                GameManager.GoToScene(GameData.Scene.MenuScene);
             }
         }
 
@@ -244,9 +156,97 @@ namespace Clicker
         {
             float rangeX = (float)random.NextDouble() * (maxBound.x - minBound.x) + minBound.x;
             float rangeY = (float)random.NextDouble() * (maxBound.y - minBound.y) + minBound.y;
-
-            Debug.Log("NIKI = " + GameData.WorldToScreen(new Vector3(rangeX, rangeY, 4f)));
             return new Vector3(rangeX, rangeY, 4f);
+        }
+
+
+        // 3. RANDOM MOVE
+
+        public void AddRandomMove(IRandomMove obj)
+        {
+            monsterList.Add(obj);
+
+            if (monsterList.Count >= MAX_SIZE)
+            {
+                GameManager.GoToScene(GameData.Scene.MenuScene);
+            }
+        }
+
+        public void RemoveRandomMove(IRandomMove obj)
+        {
+            if (monsterList.Contains(obj))
+            {
+                monsterList.Remove(obj);
+            }
+        }
+
+        public void UpdateRandomMove()
+        {
+            foreach (IRandomMove obj in monsterList)
+            {
+                if (obj.MoveTo())
+                {
+                    obj.SetDirection(GetDirectionVector(SPEED_MOVE), random.Next(400, 800));
+                }
+            }
+        }
+
+
+        // 4. CLICKER
+
+        public void AddClicker(IClick obj)
+        {
+            clickerList.Add(obj);
+        }
+
+        public void RemoveClicker(IClick obj)
+        {
+            clickerList.Remove(obj);
+        }
+
+        public void UpdateClicker()
+        {
+            if (Input.touchCount > 0)
+            {
+                Touch touch = Input.GetTouch(0);
+
+                if (touch.phase == TouchPhase.Began)
+                {
+                    foreach (IClick obj in clickerList)
+                    {
+                        obj.Click(touch.position, MAX_DAMAGE, DAMAGE_RADIUS);
+                    }
+                }
+            }
+            else if (Input.GetMouseButtonDown(0))
+            {
+                foreach (IClick obj in clickerList)
+                {
+                    obj.Click(Input.mousePosition, MAX_DAMAGE, DAMAGE_RADIUS);
+                }
+            }
+        }
+
+
+        // 5. GAME LOOP
+
+        private void UpdateSpawn()
+        {
+            if (timeSpawn-- <= 0)
+            {
+                fullTimeSpawn = Mathf.RoundToInt(fullTimeSpawn * 0.99f);
+                timeSpawn = fullTimeSpawn;
+
+                AddMonster();
+            }
+        }
+
+        private void UpdateCheckQuit()
+        {
+            if (Input.GetKey(KeyCode.Home) || Input.GetKey(KeyCode.Escape) || Input.GetKey(KeyCode.Menu))
+            {
+                GameManager.GoToScene(GameData.Scene.MenuScene);
+            }
         }
     }
 }

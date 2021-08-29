@@ -22,6 +22,7 @@ namespace Clicker
 
         public static Vector3 WorldToScreen(Vector3 vecScreen)
         {
+
             return Camera.main.WorldToScreenPoint(vecScreen);
         }
     }

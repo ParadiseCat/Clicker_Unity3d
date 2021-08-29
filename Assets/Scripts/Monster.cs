@@ -5,23 +5,34 @@ namespace Clicker
 {
     internal class Monster : MonoBehaviour, IRandomMove, IClick
     {
-        Transform objTransform;
+        bool active;
+        float hpStart;
+        float hp;
 
-        GameObject model;
-        Animation anim;
+        bool stayToDeath;
 
-        Vector3 direction;
         Vector2 minCorner;
         Vector2 maxCorner;
+        Vector3 direction;
         int stepMove;
 
-        int hp;
-        bool stayToDeath = false;
+        Transform mTransform;
+        Animation mAnimation;
+        SkinnedMeshRenderer mSkin;
+
+
+        // 1. MONOBEHAVIOUR
 
         private void Awake()
         {
             PlayController.Instance.AddRandomMove(this);
             PlayController.Instance.AddClicker(this);
+        }
+
+        public void OnDestroy()
+        {
+            PlayController.Instance.RemoveRandomMove(this);
+            PlayController.Instance.RemoveClicker(this);
         }
 
         public void InstanceDestroy()
@@ -32,67 +43,110 @@ namespace Clicker
             }
         }
 
-        public void OnDestroy()
+
+        // 2. TRANSFORM
+
+        public void ScaleModel(Vector3 scaling)
         {
-            PlayController.Instance.RemoveRandomMove(this);
-            PlayController.Instance.RemoveClicker(this);
-        }
-
-        public void AddModel(string name, string path, Vector3 position, int hp)
-        {
-            objTransform = gameObject.transform;
-            objTransform.position = position;
-
-            model = Instantiate(Resources.Load(path + name)) as GameObject;
-            model.name = name;
-            model.transform.SetParent(gameObject.transform);
-
-            this.hp = hp;
+            if (mTransform != null)
+            {
+                mTransform.localScale = scaling;
+            }
         }
 
         public void SetRotation(Quaternion rotate)
         {
-            if (objTransform != null)
+            if (mTransform != null)
             {
-                objTransform.rotation = rotate;
+                mTransform.rotation = rotate;
             }
         }
 
+
+        // 3. ANIMATION
+
         public void AddAnimation(string name, string path)
         {
-            AnimationClip clip = Resources.Load<AnimationClip>(path + name);
-
-            if (anim == null)
+            if (mAnimation != null)
             {
-                anim = model.AddComponent<Animation>();
+                AnimationClip clip = Resources.Load<AnimationClip>(path + name);
+                mAnimation.AddClip(clip, name);
             }
-
-            anim.AddClip(clip, name);
         }
 
         public void PlayAnimation(string name)
         {
-            if (anim != null)
+            if (mAnimation != null)
             {
-                anim.Play(name);
-            }    
+                mAnimation.Play(name);
+            }
         }
 
         public void AddSkin(string name, string path)
         {
-            Material skinMaterial = Resources.Load<Material>(path + name);
-
-            SkinnedMeshRenderer skin = GetComponentInChildren<SkinnedMeshRenderer>();
-            skin.material = skinMaterial;
-        }
-
-        public void ScaleModel(Vector3 scaling)
-        {
-            if (objTransform != null)
+            if (mSkin != null)
             {
-                objTransform.localScale = scaling;
+                mSkin.material = Resources.Load<Material>(path + name);
             }
         }
+
+
+        // 4. CLICK
+
+        public float Health
+        {
+            get
+            {
+                return hp;
+            }
+        }
+
+        public void InitHealth(float hpValue)
+        {
+            if (hp == 0f)
+            {
+                hp = hpValue;
+                hpStart = hp;
+                mTransform = gameObject.transform;
+                mAnimation = gameObject.AddComponent<Animation>();
+                mSkin = GetComponentInChildren<SkinnedMeshRenderer>();
+                active = true;
+            }
+        }
+
+        public void Click(Vector2 pos, float maxDamage, float damageRadius)
+        {
+            if (active)
+            {
+                Vector3 cur = GameData.WorldToScreen(mTransform.position);
+                Debug.Log("Click: pos=" + pos.ToString() + "  cur=" + cur.ToString());
+
+                float radius = Vector3.Distance(pos, cur);
+
+                if (radius < damageRadius)
+                {
+                    hp -= (damageRadius - radius) / damageRadius * maxDamage;
+
+                    if (hp <= 0f)
+                    {
+                        InstanceDestroy();
+                    }
+                    else
+                    {
+                        float hpRemains = hp / hpStart;
+                        PlayController.Instance.ChangeAnimation(this, hpRemains);
+
+                        if (hpRemains < 0.33f)
+                        {
+                            stayToDeath = true;
+                        }
+                    }
+                }
+            }
+        }
+
+
+        // 3. RANDOM MOVE
 
         public void SetDirection(Vector3 direction, int stepMove)
         {
@@ -107,13 +161,13 @@ namespace Clicker
                 return false;
             }
 
-            objTransform.position += direction;
+            mTransform.position += direction;
             stepMove--;
 
             if (minCorner != null && maxCorner != null)
             {
-                float x = objTransform.position.x;
-                float y = objTransform.position.y;
+                float x = mTransform.position.x;
+                float y = mTransform.position.y;
 
                 if (x > maxCorner.x || x < minCorner.x)
                 {
@@ -138,34 +192,6 @@ namespace Clicker
         {
             this.minCorner = minCorner;
             this.maxCorner = maxCorner;
-        }
-
-        public void Click(Vector2 pos)
-        {
-            Vector3 cur = GameData.WorldToScreen(objTransform.position);
-            Vector2 posStr = new Vector2(pos.x - 60f, pos.y - 80f);
-            Vector2 posEnd = new Vector2(pos.x + 60f, pos.y + 80f);
-
-            Debug.Log("Click: pos=" + pos.ToString() + "  cur=" + cur.ToString());
-
-            if (cur.x > posStr.x &&
-                cur.x < posEnd.x &&
-                cur.y > posStr.y &&
-                cur.y < posEnd.y)
-            {
-                hp--;
-
-                PlayController.Instance.ChangeAnimation(this, hp);
-
-                if (hp == 0)
-                {
-                    InstanceDestroy();
-                }
-                else if (hp == 1)
-                {
-                    stayToDeath = true;
-                }
-            }
         }
     }
 }

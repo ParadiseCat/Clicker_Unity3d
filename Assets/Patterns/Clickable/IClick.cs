@@ -4,6 +4,10 @@ namespace Patterns
 {
     public interface IClick
     {
-        public void Click(Vector2 pos);
+        public float Health { get; }
+
+        public void Click(Vector2 pos, float maxDamage, float damageRadius);
+
+        public void InitHealth(float hpValue);
     }
 }
